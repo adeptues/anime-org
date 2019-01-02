@@ -39,7 +39,7 @@ or use a niave solution using regex and grep the anidb xml dump
 - Add the logging crate to write sensible logs that track what was moved where
 - add searching anidb's title dump for better names or all english names as an option
 - refactor the file_map building and loginc into a fully types struct
-- remove the hardcoded paths, either add them to a settings file or let them be passed in via command args
+- remove the hardcoded paths, either add them to a settings file or let them be passed in via command args *DONE*
 - add docopt for command line parsing
 - delpoy a version to the NAS to run every 5 mins or triggered via inotify on a directory
 
