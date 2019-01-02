@@ -1,3 +1,4 @@
+
 #[macro_use] 
 extern crate serde_derive;
 #[macro_use]
@@ -9,6 +10,9 @@ extern crate regex;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+
+mod anidb;
+mod indexing;
 
 use structopt::StructOpt;
 use std::ffi::OsString;
@@ -34,6 +38,7 @@ struct Opt{
 fn main() {
     let path = "/home/tom/tom/anime-org/anime-titles.xml";
     env_logger::init();
+    
     //let search_path = Path::new("/home/tom/tom/anime-org/files");
     //TODO change opt to have a Path type instead of search path
     let opt = Opt::from_args();
@@ -126,93 +131,7 @@ fn main() {
     }
 }
 
-struct FileIndexer{
-    file_map:HashMap<String,Vec<OsString>>,
-    is_anime:Regex,
-    title:Regex
-}
 
-impl FileIndexer{
-    pub fn new() -> Self{
-        let title = match Regex::new(r"(?m)\](.*?)-") {
-            Ok(r) => r,
-            Err(e) => {
-                panic!("Could not compile regex: {}", e)
-            }
-        };
-        let is_anime = match Regex::new(r"^\[([a-zA-Z].*?)\]") {
-            Ok(r) => r,
-            Err(e) => {
-                panic!("Could not compile regex: {}", e);
-            }
-        };
-        let mut file_map:HashMap<String,Vec<OsString>> = HashMap::new();
-        return FileIndexer{file_map,is_anime,title};
-    }
-    
-    pub fn index(mut self,search_path:&Path){
-        //takes ownership of self
-        for entry in search_path.read_dir().expect("Could not read directory at search_path"){
-            let file = entry.unwrap();
-            //covnert the filename from osstring to String which we can work with
-            let file_name = file.file_name().into_string().unwrap();
-            let ospath = file.path().into_os_string();
-
-            if self.is_anime.is_match(file_name.as_str()){
-                match self.title.find(file_name.as_str()){
-                    Some(m) =>{
-                        //clean  up our match output a bit
-                        //put the title into a map of lists ... might be a better data structure/ actual struct
-                        let mut key = &file_name[m.start()+1..m.end()-1];
-                        key = key.trim();
-                        if self.file_map.contains_key(key){
-                            let v = self.file_map.get_mut(key).unwrap();
-                            v.push(ospath);
-                        }else{
-                            let vec = vec!(ospath);
-                            self.file_map.insert(key.to_string(), vec);
-                        }
-                    },
-                    None => {
-                        //could not get the show name from the file name, but we still believe this to be an anime 
-                        //so we should put it into an unknown category
-                        //TODO
-                        //println!("unknown file could not map {:?}",ospath );
-                        warn!("unknown file could not map {:?}",ospath );
-                    }
-                }
-            }
-        }
-    }
-
-    fn get_show_name(&self, file_name:String) -> Option<String>{
-        
-                 match self.title.find(file_name.as_str()){
-                    Some(m) =>{
-                        //clean  up our match output a bit
-                        //put the title into a map of lists ... might be a better data structure/ actual struct
-                        let mut key = &file_name[m.start()+1..m.end()-1];
-                        key = key.trim();
-                        return Some(key.to_string());
-                        /* if self.file_map.contains_key(key){
-                            let v = self.file_map.get_mut(key).unwrap();
-                            v.push(ospath);
-                        }else{
-                            let vec = vec!(ospath);
-                            self.file_map.insert(key.to_string(), vec);
-                        } */
-                    },
-                    None => {
-                        //could not get the show name from the file name, but we still believe this to be an anime 
-                        //so we should put it into an unknown category
-                        //TODO
-                        //println!("unknown file could not map {:?}",ospath );
-                        warn!("unknown file could not map {:?}",file_name );
-                        return None;
-                    }
-                }
-    }
-}
 
 fn to_tuple_list(file_map:HashMap<String,Vec<OsString>>,outputDir:String) -> Vec<(OsString,OsString)>{
     //let outputDir = "/home/tom/tom/anime-org/files/output";
@@ -243,34 +162,6 @@ fn to_tuple_list(file_map:HashMap<String,Vec<OsString>>,outputDir:String) -> Vec
 #[cfg(test)]
 mod tests {
     use super::*;
-    
-    #[test]
-    fn test_create_file_indexer(){
-        let fileindexer = FileIndexer::new();
-    }
-    
-    #[test]
-    fn test_get_show_name(){
-        let fileindexer = FileIndexer::new();
-        let input = "[Doki] Shinmai Maou no Testament - OVA (1920x1080 HEVC BD FLAC) [B8D7528D].mkv";
-        let expected = "Shinmai Maou no Testament";
-        let actual = fileindexer.get_show_name(String::from(input));
-        match actual{
-            Some(x) => assert_eq!(x,expected ),
-            None => assert!(false)
-        }
-    }
-    #[test]
-    fn test_get_show_name_when_uses_underscores(){
-        let fileindexer = FileIndexer::new();
-        let input = "[HorribleSubs]_Shingeki_no_Kyojin_S2_-_26_[720p].mkv";
-        let expected = "Shingeki no Kyojin S2";
-        let actual = fileindexer.get_show_name(String::from(input));
-        match actual{
-            Some(x) => assert_eq!(x,expected ),
-            None => assert!(false)
-        }
-    }
 }
 
 /// Error handling in rust seems to be in limbo at the moment as far as best practices go, so for now until a real solution appears it seems best
@@ -294,53 +185,3 @@ mod error{
     }
 }
 
-mod anidb{
-    //use std::io::Error;
-    use error::Error;
-    use serde_xml_rs::deserialize;
-    use std::fs::File;
-    use std::io::prelude::*;
-    //use std::io::Result;
-    use std::path::Path;
-
-    #[derive(Serialize, Deserialize, Debug)]
-    pub struct Title{
-        #[serde(rename = "type", default)]
-        title_type:String,
-        #[serde(rename = "xml:lang", default)]
-        lang:String,
-        #[serde(rename = "$value")]
-        value:String
-    }
-    #[derive(Serialize, Deserialize, Debug)]
-    pub struct Anime{
-        aid:String,
-        #[serde(rename = "title", default)]
-        titles:Vec<Title>
-    }
-
-    #[derive(Serialize, Deserialize, Debug)]
-    pub struct AnimeTitles{
-        anime:Vec<Anime>
-    }
-    impl AnimeTitles{
-        pub fn find_by_aid(&self,aid:usize) -> Option<&Anime>{
-            for anime in self.anime.iter(){
-                let id:usize = anime.aid.parse().unwrap();
-                if id == aid{
-                    return Some(anime);
-                }
-            }
-            return None;
-        }
-        pub fn load(file_path:&Path) -> Result<AnimeTitles,Error>{
-            //load from the xml file and return an animetitles object
-            if file_path.exists(){
-                let f:File = File::open(file_path)?;
-                let anime_titles:AnimeTitles = deserialize(f).unwrap();
-                return Ok(anime_titles);
-            }
-            return Err(Error::FileNotFound)
-        }
-    }
-}
