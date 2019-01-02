@@ -65,9 +65,9 @@ fn main() {
             return;
         }
     };
-    let mut file_map:HashMap<String,Vec<OsString>> = HashMap::new();
+    //let mut file_map:HashMap<String,Vec<OsString>> = HashMap::new();
     //find all the mkv files and apply our is anime regex
-    for entry in search_path.read_dir().expect("Could not read directory at search_path"){
+    /* for entry in search_path.read_dir().expect("Could not read directory at search_path"){
         let file = entry.unwrap();
         //covnert the filename from osstring to String which we can work with
         let file_name = file.file_name().into_string().unwrap();
@@ -97,7 +97,9 @@ fn main() {
                 }
             }
         }
-    }
+    } */
+    let indexer = indexing::FileIndexer::new();
+    let file_map = indexer.index(search_path);
     //we've now built our filemap, we need to search anidb for the proper filename this can be a future improvement
     
     //for now turn the filemap into a list of tuple where each tuple describes the move operation
@@ -108,11 +110,11 @@ fn main() {
         let mut to_path_buf = to.to_path_buf();
         to_path_buf.pop();
         let to_location = Path::new(&to_path_buf);
-        info!("moving file {:?} to {:?}",from,to );
+        
         if to_location.exists() && to_location.is_dir(){
             //go ahead and copy
             match std::fs::rename(from, to){
-                Ok(_) => info!("Success!"),
+                Ok(_) => info!("moved file {:?} to {:?}",from,to ),
                 Err(_) => error!("Could not move {:?} to {:?}",from,to)
             }
             
@@ -124,7 +126,7 @@ fn main() {
             }
             //std::fs::rename(from, to).expect("Could not copy file");
             match std::fs::rename(from, to){
-                Ok(_) => info!("Success!"),
+                Ok(_) => info!("moved file {:?} to {:?}",from,to),
                 Err(e) => error!("{:?} Could not move {:?} to {:?}",e,from,to)
             }
         }
