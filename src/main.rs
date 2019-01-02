@@ -6,6 +6,9 @@ extern crate structopt;
 extern crate serde;
 extern crate serde_xml_rs;
 extern crate regex;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 
 use structopt::StructOpt;
 use std::ffi::OsString;
@@ -30,9 +33,12 @@ struct Opt{
 
 fn main() {
     let path = "/home/tom/tom/anime-org/anime-titles.xml";
+    env_logger::init();
     //let search_path = Path::new("/home/tom/tom/anime-org/files");
     //TODO change opt to have a Path type instead of search path
     let opt = Opt::from_args();
+    debug!("search_path {:?}",opt.search_path);
+    debug!("output_path {:?}",opt.output_path);
     let search_path = Path::new(&opt.search_path);
     
     /* let db = match anidb::AnimeTitles::load(p) {
@@ -43,14 +49,14 @@ fn main() {
     let title_regex = match Regex::new(r"(?m)\](.*?)-") {
         Ok(r) => r,
         Err(e) => {
-            println!("Could not compile regex: {}", e);
+            error!("Could not compile regex: {}", e);
             return;
         }
     };
     let is_anime_regex = match Regex::new(r"^\[([a-zA-Z].*?)\]") {
         Ok(r) => r,
         Err(e) => {
-            println!("Could not compile regex: {}", e);
+            error!("Could not compile regex: {}", e);
             return;
         }
     };
@@ -81,7 +87,8 @@ fn main() {
                     //could not get the show name from the file name, but we still believe this to be an anime 
                     //so we should put it into an unknown category
                     //TODO
-                    println!("unknown file could not map {:?}",ospath );
+                    //println!("unknown file could not map {:?}",ospath );
+                    warn!("unknown file could not map {:?}",ospath );
                 }
             }
         }
@@ -96,19 +103,114 @@ fn main() {
         let mut to_path_buf = to.to_path_buf();
         to_path_buf.pop();
         let to_location = Path::new(&to_path_buf);
-        println!("moving file {:?} to {:?}",from,to );
+        info!("moving file {:?} to {:?}",from,to );
         if to_location.exists() && to_location.is_dir(){
             //go ahead and copy
-            std::fs::rename(from, to).expect("Could not copy file");
-            println!("\t Success!");
+            match std::fs::rename(from, to){
+                Ok(_) => info!("Success!"),
+                Err(_) => error!("Could not move {:?} to {:?}",from,to)
+            }
+            
         }else{
-            println!("Creating directory {:?}",to_location );
             //create the directory and copy
-            std::fs::create_dir(to_location).expect("Could not create directory");
-            std::fs::rename(from, to).expect("Could not copy file");
-            println!("\t Success!");
+            match std::fs::create_dir(to_location){
+                Ok(_) => info!("Creating directory {:?}",to_location ),
+                Err(e) => error!("{} Could not create directory at {:?}",e,to_location)
+            }
+            //std::fs::rename(from, to).expect("Could not copy file");
+            match std::fs::rename(from, to){
+                Ok(_) => info!("Success!"),
+                Err(e) => error!("{:?} Could not move {:?} to {:?}",e,from,to)
+            }
         }
+    }
+}
 
+struct FileIndexer{
+    file_map:HashMap<String,Vec<OsString>>,
+    is_anime:Regex,
+    title:Regex
+}
+
+impl FileIndexer{
+    pub fn new() -> Self{
+        let title = match Regex::new(r"(?m)\](.*?)-") {
+            Ok(r) => r,
+            Err(e) => {
+                panic!("Could not compile regex: {}", e)
+            }
+        };
+        let is_anime = match Regex::new(r"^\[([a-zA-Z].*?)\]") {
+            Ok(r) => r,
+            Err(e) => {
+                panic!("Could not compile regex: {}", e);
+            }
+        };
+        let mut file_map:HashMap<String,Vec<OsString>> = HashMap::new();
+        return FileIndexer{file_map,is_anime,title};
+    }
+    
+    pub fn index(mut self,search_path:&Path){
+        //takes ownership of self
+        for entry in search_path.read_dir().expect("Could not read directory at search_path"){
+            let file = entry.unwrap();
+            //covnert the filename from osstring to String which we can work with
+            let file_name = file.file_name().into_string().unwrap();
+            let ospath = file.path().into_os_string();
+
+            if self.is_anime.is_match(file_name.as_str()){
+                match self.title.find(file_name.as_str()){
+                    Some(m) =>{
+                        //clean  up our match output a bit
+                        //put the title into a map of lists ... might be a better data structure/ actual struct
+                        let mut key = &file_name[m.start()+1..m.end()-1];
+                        key = key.trim();
+                        if self.file_map.contains_key(key){
+                            let v = self.file_map.get_mut(key).unwrap();
+                            v.push(ospath);
+                        }else{
+                            let vec = vec!(ospath);
+                            self.file_map.insert(key.to_string(), vec);
+                        }
+                    },
+                    None => {
+                        //could not get the show name from the file name, but we still believe this to be an anime 
+                        //so we should put it into an unknown category
+                        //TODO
+                        //println!("unknown file could not map {:?}",ospath );
+                        warn!("unknown file could not map {:?}",ospath );
+                    }
+                }
+            }
+        }
+    }
+
+    fn get_show_name(&self, file_name:String) -> Option<String>{
+        
+                 match self.title.find(file_name.as_str()){
+                    Some(m) =>{
+                        //clean  up our match output a bit
+                        //put the title into a map of lists ... might be a better data structure/ actual struct
+                        let mut key = &file_name[m.start()+1..m.end()-1];
+                        key = key.trim();
+                        return Some(key.to_string());
+                        /* if self.file_map.contains_key(key){
+                            let v = self.file_map.get_mut(key).unwrap();
+                            v.push(ospath);
+                        }else{
+                            let vec = vec!(ospath);
+                            self.file_map.insert(key.to_string(), vec);
+                        } */
+                    },
+                    None => {
+                        //could not get the show name from the file name, but we still believe this to be an anime 
+                        //so we should put it into an unknown category
+                        //TODO
+                        //println!("unknown file could not map {:?}",ospath );
+                        warn!("unknown file could not map {:?}",file_name );
+                        return None;
+                    }
+                }
     }
 }
 
@@ -136,6 +238,39 @@ fn to_tuple_list(file_map:HashMap<String,Vec<OsString>>,outputDir:String) -> Vec
         }
     }
     return output;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_create_file_indexer(){
+        let fileindexer = FileIndexer::new();
+    }
+    
+    #[test]
+    fn test_get_show_name(){
+        let fileindexer = FileIndexer::new();
+        let input = "[Doki] Shinmai Maou no Testament - OVA (1920x1080 HEVC BD FLAC) [B8D7528D].mkv";
+        let expected = "Shinmai Maou no Testament";
+        let actual = fileindexer.get_show_name(String::from(input));
+        match actual{
+            Some(x) => assert_eq!(x,expected ),
+            None => assert!(false)
+        }
+    }
+    #[test]
+    fn test_get_show_name_when_uses_underscores(){
+        let fileindexer = FileIndexer::new();
+        let input = "[HorribleSubs]_Shingeki_no_Kyojin_S2_-_26_[720p].mkv";
+        let expected = "Shingeki no Kyojin S2";
+        let actual = fileindexer.get_show_name(String::from(input));
+        match actual{
+            Some(x) => assert_eq!(x,expected ),
+            None => assert!(false)
+        }
+    }
 }
 
 /// Error handling in rust seems to be in limbo at the moment as far as best practices go, so for now until a real solution appears it seems best
