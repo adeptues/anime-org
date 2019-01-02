@@ -1,10 +1,13 @@
 #[macro_use] 
 extern crate serde_derive;
+#[macro_use]
+extern crate structopt;
 
 extern crate serde;
 extern crate serde_xml_rs;
 extern crate regex;
 
+use structopt::StructOpt;
 use std::ffi::OsString;
 use regex::Regex;
 
@@ -12,10 +15,26 @@ use std::path::Path;
 use std::fs::File;
 use std::io::prelude::*;
 use std::collections::{HashMap,LinkedList};
+
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "anime-org")]
+struct Opt{
+    /// The search path for where to look for files that need moving
+    #[structopt(short = "s", long = "search_path")]
+    search_path:String,
+    /// The output directory, where directories should be created and files moved too
+    #[structopt(short = "o", long = "output_path")]
+    output_path:String
+}
+
 fn main() {
     let path = "/home/tom/tom/anime-org/anime-titles.xml";
-    let search_path = Path::new("/home/tom/tom/anime-org/files");
-    let p = Path::new(path);
+    //let search_path = Path::new("/home/tom/tom/anime-org/files");
+    //TODO change opt to have a Path type instead of search path
+    let opt = Opt::from_args();
+    let search_path = Path::new(&opt.search_path);
+    
     /* let db = match anidb::AnimeTitles::load(p) {
         Ok(s) => s,
         Err(_) => panic!("could not load the database")
@@ -70,7 +89,7 @@ fn main() {
     //we've now built our filemap, we need to search anidb for the proper filename this can be a future improvement
     
     //for now turn the filemap into a list of tuple where each tuple describes the move operation
-    let tuples = to_tuple_list(file_map);
+    let tuples = to_tuple_list(file_map,opt.output_path);
     for pair in tuples{
         let from = Path::new(&pair.0);
         let to = Path::new(&pair.1);
@@ -93,8 +112,8 @@ fn main() {
     }
 }
 
-fn to_tuple_list(file_map:HashMap<String,Vec<OsString>>) -> Vec<(OsString,OsString)>{
-    let outputDir = "/home/tom/tom/anime-org/files/output";
+fn to_tuple_list(file_map:HashMap<String,Vec<OsString>>,outputDir:String) -> Vec<(OsString,OsString)>{
+    //let outputDir = "/home/tom/tom/anime-org/files/output";
     let mut output:Vec<(OsString,OsString)> = Vec::new();
     /* for (k,v) in file_map.iter(){
         //get the filename create a new path
@@ -111,7 +130,7 @@ fn to_tuple_list(file_map:HashMap<String,Vec<OsString>>) -> Vec<(OsString,OsStri
     for(k,v) in file_map.iter(){
         for i in v{
             let orginal_path = Path::new(i);
-            let new_path = Path::new(outputDir);
+            let new_path = Path::new(&outputDir);
             let new_path = new_path.join(k).join(orginal_path.file_name().unwrap());
             output.push((orginal_path.to_path_buf().into_os_string(),new_path.to_path_buf().into_os_string()));
         }

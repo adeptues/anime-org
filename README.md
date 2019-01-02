@@ -34,3 +34,13 @@ or use a niave solution using regex and grep the anidb xml dump
 - update our show struct with the offical title
 - then create an entry in the specifed folder if it does not already exist for the show title
 - then move the individual files from their orginal location to the new folder we created
+
+## TODO
+- Add the logging crate to write sensible logs that track what was moved where
+- add searching anidb's title dump for better names or all english names as an option
+- refactor the file_map building and loginc into a fully types struct
+- remove the hardcoded paths, either add them to a settings file or let them be passed in via command args
+- add docopt for command line parsing
+- delpoy a version to the NAS to run every 5 mins or triggered via inotify on a directory
+
+- Maybe as a seperate task project or an extra feature see if we can extract the watch history from kodi so we know what eps we've watched
