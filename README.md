@@ -40,7 +40,8 @@ or use a niave solution using regex and grep the anidb xml dump
 - add searching anidb's title dump for better names or all english names as an option
 - refactor the file_map building and loginc into a fully types struct
 - remove the hardcoded paths, either add them to a settings file or let them be passed in via command args *DONE*
-- add docopt for command line parsing
+- add docopt for command line parsing *DONE*
+- Change the structopt from a string type to Path
 - delpoy a version to the NAS to run every 5 mins or triggered via inotify on a directory
 
 - Maybe as a seperate task project or an extra feature see if we can extract the watch history from kodi so we know what eps we've watched
