@@ -16,13 +16,10 @@ mod indexing;
 
 use structopt::StructOpt;
 use std::ffi::OsString;
-use regex::Regex;
 
 use std::path::Path;
-use std::fs::File;
-use std::io::prelude::*;
-use std::collections::{HashMap,LinkedList};
-
+use std::collections::{HashMap};
+use env_logger::{Builder, Target};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "anime-org")]
@@ -36,9 +33,12 @@ struct Opt{
 }
 
 fn main() {
-    let path = "/home/tom/tom/anime-org/anime-titles.xml";
-    env_logger::init();
+    //let path = "/home/tom/tom/anime-org/anime-titles.xml";
     
+    let mut builder = Builder::from_default_env();
+    builder.target(Target::Stdout);
+    builder.init();
+    info!("********** Start Up ************");
     //let search_path = Path::new("/home/tom/tom/anime-org/files");
     //TODO change opt to have a Path type instead of search path
     let opt = Opt::from_args();
@@ -51,7 +51,7 @@ fn main() {
         Err(_) => panic!("could not load the database")
     }; */
     //Compile our regexes
-    let title_regex = match Regex::new(r"(?m)\](.*?)-") {
+    /* let title_regex = match Regex::new(r"(?m)\](.*?)-") {
         Ok(r) => r,
         Err(e) => {
             error!("Could not compile regex: {}", e);
@@ -64,7 +64,7 @@ fn main() {
             error!("Could not compile regex: {}", e);
             return;
         }
-    };
+    }; */
     //let mut file_map:HashMap<String,Vec<OsString>> = HashMap::new();
     //find all the mkv files and apply our is anime regex
     /* for entry in search_path.read_dir().expect("Could not read directory at search_path"){
@@ -135,7 +135,7 @@ fn main() {
 
 
 
-fn to_tuple_list(file_map:HashMap<String,Vec<OsString>>,outputDir:String) -> Vec<(OsString,OsString)>{
+fn to_tuple_list(file_map:HashMap<String,Vec<OsString>>,output_dir:String) -> Vec<(OsString,OsString)>{
     //let outputDir = "/home/tom/tom/anime-org/files/output";
     let mut output:Vec<(OsString,OsString)> = Vec::new();
     /* for (k,v) in file_map.iter(){
@@ -153,7 +153,7 @@ fn to_tuple_list(file_map:HashMap<String,Vec<OsString>>,outputDir:String) -> Vec
     for(k,v) in file_map.iter(){
         for i in v{
             let orginal_path = Path::new(i);
-            let new_path = Path::new(&outputDir);
+            let new_path = Path::new(&output_dir);
             let new_path = new_path.join(k).join(orginal_path.file_name().unwrap());
             output.push((orginal_path.to_path_buf().into_os_string(),new_path.to_path_buf().into_os_string()));
         }

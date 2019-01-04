@@ -4,9 +4,7 @@ use std::ffi::OsString;
 use regex::Regex;
 
 use std::path::Path;
-use std::fs::File;
-use std::io::prelude::*;
-use std::collections::{HashMap,LinkedList};
+use std::collections::{HashMap};
 
 pub struct FileIndexer{
     file_map:HashMap<String,Vec<OsString>>,
@@ -28,7 +26,7 @@ impl FileIndexer{
                 panic!("Could not compile regex: {}", e);
             }
         };
-        let mut file_map:HashMap<String,Vec<OsString>> = HashMap::new();
+        let file_map:HashMap<String,Vec<OsString>> = HashMap::new();
         return FileIndexer{file_map,is_anime,title};
     }
     
